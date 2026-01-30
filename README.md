@@ -1,0 +1,1 @@
+# idit-intellij-terminal-plugin
