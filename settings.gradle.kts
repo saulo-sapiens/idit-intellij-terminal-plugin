@@ -1,0 +1,1 @@
+rootProject.name = "idit-intellij-terminal-plugin"

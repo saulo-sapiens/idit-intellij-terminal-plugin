@@ -1,0 +1,11 @@
+<idea-plugin>
+  <idea-version since-build="252" />
+  <id>com.idit.intellij.terminal.bridge</id>
+  <name>IDIT Terminal Bridge</name>
+  <vendor>IDIT</vendor>
+  <depends>com.intellij.modules.platform</depends>
+  <depends>org.jetbrains.plugins.terminal</depends>
+  <extensions defaultExtensionNs="com.intellij">
+    <postStartupActivity implementation="com.idit.intellij.terminal.TerminalServerActivity" />
+  </extensions>
+</idea-plugin>
