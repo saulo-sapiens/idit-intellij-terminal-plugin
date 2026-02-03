@@ -1,5 +1,6 @@
 <idea-plugin>
-  <idea-version since-build="252" />
+  <idea-version since-build="243" until-build="251.*" />
+  <version>1.0-SNAPSHOT</version>
   <id>com.idit.intellij.terminal.bridge</id>
   <name>IDIT Terminal Bridge</name>
   <vendor>IDIT</vendor>
