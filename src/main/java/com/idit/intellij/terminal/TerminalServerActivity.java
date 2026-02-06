@@ -1,5 +1,8 @@
 package com.idit.intellij.terminal;
 
+import com.intellij.ide.DataManager;
+import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.startup.ProjectActivity;
@@ -13,10 +16,12 @@ import kotlin.coroutines.Continuation;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.awt.*;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.awt.Window;
 
@@ -38,24 +43,29 @@ public class TerminalServerActivity implements ProjectActivity {
         try {
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", 9999), 0);
             server.createContext("/exec", exchange -> {
-                Headers requestHeaders = exchange.getRequestHeaders();
-                String workingDir = requestHeaders.getFirst("X-Working-Dir");
+                try {
+                    Headers requestHeaders = exchange.getRequestHeaders();
+                    String workingDir = requestHeaders.getFirst("X-Working-Dir");
+    
+                    String command = new BufferedReader(new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))
+                            .lines().collect(Collectors.joining("\n"));
+    
+                    // Logic to find the focused project window
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        Project activeProject = findActiveProject();
+                        if (activeProject != null) {
+                            openAndRun(activeProject, command, workingDir);
+                        }
+                    });
 
-                String command = new BufferedReader(new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))
-                        .lines().collect(Collectors.joining("\n"));
-
-                // Logic to find the focused project window
-                ApplicationManager.getApplication().invokeLater(() -> {
-                    Project activeProject = findActiveProject();
-                    if (activeProject != null) {
-                        openAndRun(activeProject, command, workingDir);
-                    }
-                });
-
-                byte[] response = "OK".getBytes();
-                exchange.sendResponseHeaders(200, response.length);
-                exchange.getResponseBody().write(response);
-                exchange.close();
+                    byte[] response = "OK".getBytes();
+                    exchange.sendResponseHeaders(200, response.length);
+                    exchange.getResponseBody().write(response);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    exchange.close();
+                }
             });
             server.start();
         } catch (Exception e) {
@@ -64,13 +74,23 @@ public class TerminalServerActivity implements ProjectActivity {
     }
 
     private Project findActiveProject() {
-        // Look for the IDE window that currently has focus
         Window focusedWindow = WindowManager.getInstance().getMostRecentFocusedWindow();
-        Project project = WindowManager.getInstance().getProject(focusedWindow);
+        Project project = null;
 
-        // Fallback: If no focus, just take the first available project
+        if (focusedWindow != null) {
+            try {
+                // Get the DataContext from the current focus to find the project
+                DataContext context = DataManager.getInstance().getDataContextFromFocusAsync()
+                        .blockingGet(500, TimeUnit.MILLISECONDS);
+                if (context != null) {
+                    project = CommonDataKeys.PROJECT.getData(context);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // Fallback: Use the first open project if focus-based detection fails
         if (project == null) {
-            Project[] projects = com.intellij.openapi.project.ProjectManager.getInstance().getOpenProjects();
+            Project[] projects = ProjectManager.getInstance().getOpenProjects();
             return projects.length > 0 ? projects[0] : null;
         }
         return project;
